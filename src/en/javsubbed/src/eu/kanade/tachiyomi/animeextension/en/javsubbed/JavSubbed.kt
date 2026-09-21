@@ -199,6 +199,7 @@ class JavSubbed : AnimeHttpSource() {
         for (hoster in hosters) {
             if (!foundPlayable) {
                 val videos = extractProviderVideos(hoster, requestHeaders)
+                    .filter(::isPlayableVideo)
                 if (videos.isNotEmpty()) {
                     resolved += Hoster(
                         hosterUrl = hoster.hosterUrl,
@@ -316,6 +317,7 @@ class JavSubbed : AnimeHttpSource() {
 
             for (candidate in candidates) {
                 val videos = extractProviderVideos(candidate, pageHeaders)
+                    .filter(::isPlayableVideo)
                 if (videos.isNotEmpty()) return videos
             }
 
@@ -343,7 +345,10 @@ class JavSubbed : AnimeHttpSource() {
             .set("Referer", baseUrl)
             .build()
 
-        extractProviderVideos(hoster, hostHeaders).takeIf { it.isNotEmpty() }?.let { return it }
+        extractProviderVideos(hoster, hostHeaders)
+            .filter(::isPlayableVideo)
+            .takeIf { it.isNotEmpty() }
+            ?.let { return it }
 
         val response = client.newCall(GET(hoster.hosterUrl, hostHeaders)).awaitSuccess()
         return response.use { parseEmbeddedVideos(it, hoster, hostHeaders) }
