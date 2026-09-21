@@ -219,7 +219,7 @@ class JavEnglish : AnimeHttpSource() {
         return Hoster(
             hosterUrl = url,
             hosterName = label,
-            lazy = true,
+            lazy = false,
         )
     }
 
