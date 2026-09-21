@@ -225,9 +225,143 @@ class JavEnglish : AnimeHttpSource() {
             .set("Referer", baseUrl)
             .build()
 
+        extractProviderVideos(hoster, hostHeaders).takeIf { it.isNotEmpty() }?.let { return it }
+
         val response = client.newCall(GET(hoster.hosterUrl, hostHeaders)).awaitSuccess()
         return response.use { parseEmbeddedVideos(it, hoster, hostHeaders) }
     }
+
+    private fun extractProviderVideos(hoster: Hoster, requestHeaders: Headers): List<Video> {
+        val url = hoster.hosterUrl
+        val host = runCatching { java.net.URI(url).host.orEmpty().lowercase() }.getOrDefault("")
+
+        return when {
+            "streamtape" in host -> extractStreamTape(url, hoster.hosterName)
+            "dood" in host || "playmogo" in host -> extractDood(url, hoster.hosterName)
+            "voe" in host -> extractVoe(url, hoster.hosterName, requestHeaders)
+            "turbovid" in host || "emturbovid" in host -> extractGenericProvider(url, hoster.hosterName, requestHeaders)
+            else -> emptyList()
+        }
+    }
+
+    private fun extractStreamTape(url: String, label: String): List<Video> = runCatching {
+        val response = client.newCall(GET(url, headers)).execute()
+        val document = response.use { it.asJsoup() }
+
+        val targetLine = "document.getElementById('robotlink')"
+        val script = document.selectFirst("script:containsData($targetLine)")
+            ?.data()
+            ?: return@runCatching emptyList()
+
+        val first = script.substringAfter("$targetLine.innerHTML = '", "")
+        if (first.isBlank()) return@runCatching emptyList()
+
+        val videoUrl = "https:" +
+            first.substringBefore("'") +
+            script.substringAfter("+ ('xcd", "").substringBefore("'")
+
+        if (videoUrl.length <= 8) return@runCatching emptyList()
+
+        listOf(
+            Video(
+                videoUrl = videoUrl,
+                videoTitle = label.ifBlank { "StreamTape" },
+                headers = headers,
+                initialized = true,
+            ),
+        )
+    }.getOrDefault(emptyList())
+
+    private fun extractDood(url: String, label: String): List<Video> = runCatching {
+        val response = client.newCall(GET(url, headers)).execute()
+        val finalUrl = response.request.url.toString()
+        val body = response.body.string()
+
+        if (!body.contains("'/pass_md5/")) return@runCatching emptyList()
+
+        val md5 = body.substringAfter("'/pass_md5/").substringBefore("',")
+        val token = md5.substringAfterLast("/")
+        val host = java.net.URI(finalUrl).host ?: return@runCatching emptyList()
+
+        val videoStart = client.newCall(
+            GET(
+                "https://$host/pass_md5/$md5",
+                Headers.headersOf("Referer", finalUrl),
+            ),
+        ).execute().use { it.body.string() }
+
+        if (videoStart.isBlank()) return@runCatching emptyList()
+
+        val allowed = (('A'..'Z') + ('a'..'z') + ('0'..'9'))
+        val random = (1..10).map { allowed.random() }.joinToString("")
+        val videoUrl = "$videoStart$random?token=$token&expiry=${System.currentTimeMillis()}"
+        val videoHeaders = Headers.Builder()
+            .set("User-Agent", "Aniyomi")
+            .set("Referer", "https://$host/")
+            .build()
+
+        listOf(
+            Video(
+                videoUrl = videoUrl,
+                videoTitle = label.ifBlank { "DoodStream" },
+                headers = videoHeaders,
+                initialized = true,
+            ),
+        )
+    }.getOrDefault(emptyList())
+
+    private fun extractVoe(url: String, label: String, requestHeaders: Headers): List<Video> = runCatching {
+        val response = client.newCall(GET(url, requestHeaders)).execute()
+        val finalUrl = response.request.url.toString()
+        val body = response.body.string()
+
+        val candidates = linkedSetOf<String>()
+        MEDIA_REGEX.findAll(body).forEach { match ->
+            candidates += match.value.replace("\\/","/")
+        }
+
+        BASE64_REGEX.findAll(body).forEach { match ->
+            val raw = match.value.trim('\'', '"')
+            val decoded = runCatching {
+                String(java.util.Base64.getDecoder().decode(raw))
+            }.getOrNull() ?: return@forEach
+
+            MEDIA_REGEX.findAll(decoded).forEach { media ->
+                candidates += media.value.replace("\\/","/")
+            }
+        }
+
+        candidates
+            .filter { it.isDirectMedia() && !it.isLikelyAdMedia() }
+            .map { media ->
+                Video(
+                    videoUrl = media,
+                    videoTitle = label.ifBlank { "VOE" },
+                    headers = requestHeaders.newBuilder().set("Referer", finalUrl).build(),
+                    initialized = true,
+                )
+            }
+    }.getOrDefault(emptyList())
+
+    private fun extractGenericProvider(url: String, label: String, requestHeaders: Headers): List<Video> = runCatching {
+        val response = client.newCall(GET(url, requestHeaders)).execute()
+        val finalUrl = response.request.url.toString()
+        val body = response.body.string()
+
+        MEDIA_REGEX.findAll(body)
+            .map { it.value.replace("\\/","/") }
+            .filter { it.isDirectMedia() && !it.isLikelyAdMedia() }
+            .distinct()
+            .map { media ->
+                Video(
+                    videoUrl = media,
+                    videoTitle = label,
+                    headers = requestHeaders.newBuilder().set("Referer", finalUrl).build(),
+                    initialized = true,
+                )
+            }
+            .toList()
+    }.getOrDefault(emptyList())
 
     private fun parseEmbeddedVideos(
         response: Response,
@@ -318,6 +452,7 @@ class JavEnglish : AnimeHttpSource() {
     }
 
     companion object {
+        private val BASE64_REGEX = Regex("""[A-Za-z0-9+/]{40,}={0,2}""")
         private val MEDIA_REGEX = Regex(
             """https?:\\?/\\?/[^"'<>\\s]+?(?:\\.m3u8|\\.mp4|\\.webm)(?:\\?[^"'<>\\s]*)?""",
             RegexOption.IGNORE_CASE,
