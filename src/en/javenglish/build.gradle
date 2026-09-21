@@ -1,0 +1,8 @@
+ext {
+    extName = 'JAVEnglish'
+    extClass = '.JavEnglish'
+    extVersionCode = 1
+    isNsfw = true
+}
+
+apply from: "$rootDir/common.gradle"
