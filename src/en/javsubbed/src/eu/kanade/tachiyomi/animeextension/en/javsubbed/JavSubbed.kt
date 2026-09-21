@@ -179,24 +179,38 @@ class JavSubbed : AnimeHttpSource() {
         parseHosters(response.asJsoup())
 
     private fun parseHosters(document: Document): List<Hoster> {
-        val streamHosters = document.select("a[href]")
+        val discovered = document.select("a[href]")
             .mapNotNull { anchor ->
-                val label = anchor.text().trim()
-                if (!label.startsWith("Stream", ignoreCase = true)) return@mapNotNull null
-
                 val url = anchor.attr("abs:href").ifBlank { anchor.attr("href") }
-                if (url.isBlank() || url.isLikelyAdMedia()) null else makeHoster(url, label)
+                if (url.isBlank() || url.isLikelyAdMedia() || !url.isKnownVideoHost()) {
+                    return@mapNotNull null
+                }
+
+                val label = anchor.text().trim().ifBlank {
+                    when {
+                        "streamtape" in url.lowercase() -> "StreamTape"
+                        "voe." in url.lowercase() -> "VOE"
+                        "dood" in url.lowercase() || "playmogo" in url.lowercase() -> "DoodStream"
+                        "turbovid" in url.lowercase() -> "TurboVid"
+                        else -> url.substringAfter("://").substringBefore("/")
+                    }
+                }
+
+                makeHoster(url, label)
             }
             .distinctBy { it.hosterUrl }
 
-        // Prefer the site's explicit stream buttons. Generic page iframes may be
-        // short pre-roll/advertising media rather than the requested title.
-        if (streamHosters.isNotEmpty()) return streamHosters
+        if (discovered.isNotEmpty()) return discovered
 
+        // Fallback for sites that move provider URLs into iframe elements.
         return document.select("iframe[src]")
             .mapNotNull { iframe ->
                 val url = iframe.attr("abs:src").ifBlank { iframe.attr("src") }
-                if (url.isBlank() || url.isLikelyAdMedia()) null else makeHoster(url, "Primary")
+                if (url.isBlank() || url.isLikelyAdMedia() || !url.isKnownVideoHost()) {
+                    null
+                } else {
+                    makeHoster(url, "Primary")
+                }
             }
             .distinctBy { it.hosterUrl }
     }
@@ -435,6 +449,17 @@ class JavSubbed : AnimeHttpSource() {
     }
 
     override fun List<Video>.sortVideos(): List<Video> = this
+
+    private fun String.isKnownVideoHost(): Boolean {
+        val value = lowercase()
+        return "streamtape." in value ||
+            "voe." in value ||
+            "doodstream." in value ||
+            "playmogo." in value ||
+            "emturbovid." in value ||
+            "turbovidhls." in value ||
+            "turbovid." in value
+    }
 
     private fun String.isLikelyAdMedia(): Boolean {
         val value = lowercase()
