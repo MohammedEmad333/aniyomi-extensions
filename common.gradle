@@ -20,7 +20,7 @@ android {
         targetSdkVersion AndroidConfig.targetSdk
         applicationIdSuffix project.parent.name + "." + project.name
         versionCode extVersionCode
-        versionName "14.$versionCode"
+        versionName "17.$versionCode"
         base {
             archivesName = "aniyomi-$applicationIdSuffix-v$versionName"
         }
