@@ -27,7 +27,35 @@ jobs:
       - name: Validate Gradle project
         run: gradle projects
 
+      - name: Prepare signing key
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          ALIAS: ${{ secrets.ALIAS }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for var in SIGNING_KEY ALIAS KEY_STORE_PASSWORD KEY_PASSWORD; do
+            if [ -z "${!var:-}" ]; then
+              echo "::error::Missing required repository secret: $var"
+              exit 1
+            fi
+          done
+          printf '%s' "$SIGNING_KEY" | base64 -d > signingkey.jks
+          chmod 600 signingkey.jks
+          FINGERPRINT="$(keytool -list -v -keystore signingkey.jks -storepass "$KEY_STORE_PASSWORD" -alias "$ALIAS" | awk -F': ' '/SHA256:/{gsub(":", "", $2); print tolower($2); exit}')"
+          test -n "$FINGERPRINT"
+          echo "SIGNING_KEY_PATH=$GITHUB_WORKSPACE/signingkey.jks" >> "$GITHUB_ENV"
+          echo "SIGNING_KEY_FINGERPRINT=$FINGERPRINT" >> "$GITHUB_ENV"
+
       - name: Build extension APKs
+        env:
+          SIGNING_KEY_PATH: ${{ env.SIGNING_KEY_PATH }}
+          ALIAS: ${{ secrets.ALIAS }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         shell: bash
         run: |
           shopt -s nullglob
@@ -128,6 +156,9 @@ jobs:
               json.dumps(data, separators=(",", ":"), ensure_ascii=False) + "\n",
               encoding="utf-8",
           )
+          import os
+
+          fingerprint = os.environ["SIGNING_KEY_FINGERPRINT"]
           Path("publish/repo.json").write_text(
               json.dumps(
                   {
@@ -135,6 +166,7 @@ jobs:
                           "name": "MohammedEmad333 Aniyomi Extensions",
                           "shortName": "mohammedemad333",
                           "website": "https://github.com/MohammedEmad333/aniyomi-extensions",
+                          "signingKeyFingerprint": fingerprint,
                       }
                   },
                   indent=2,
@@ -156,3 +188,7 @@ jobs:
           git -C publish add -A
           git -C publish commit -m "Publish Aniyomi repository" || true
           git -C publish push origin repo
+
+      - name: Remove signing key
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: rm -f signingkey.jks
