@@ -179,22 +179,26 @@ class JavSubbed : AnimeHttpSource() {
         parseHosters(response.asJsoup())
 
     private fun parseHosters(document: Document): List<Hoster> {
-        val hosters = mutableListOf<Hoster>()
+        val streamHosters = document.select("a[href]")
+            .mapNotNull { anchor ->
+                val label = anchor.text().trim()
+                if (!label.startsWith("Stream", ignoreCase = true)) return@mapNotNull null
 
-        document.select("iframe[src]").forEach { iframe ->
-            val url = iframe.attr("abs:src").ifBlank { iframe.attr("src") }
-            if (url.isNotBlank()) hosters += makeHoster(url, "Primary")
-        }
+                val url = anchor.attr("abs:href").ifBlank { anchor.attr("href") }
+                if (url.isBlank() || url.isLikelyAdMedia()) null else makeHoster(url, label)
+            }
+            .distinctBy { it.hosterUrl }
 
-        document.select("a[href]").forEach { anchor ->
-            val label = anchor.text().trim()
-            if (!label.startsWith("Stream", ignoreCase = true)) return@forEach
+        // Prefer the site's explicit stream buttons. Generic page iframes may be
+        // short pre-roll/advertising media rather than the requested title.
+        if (streamHosters.isNotEmpty()) return streamHosters
 
-            val url = anchor.attr("abs:href").ifBlank { anchor.attr("href") }
-            if (url.isNotBlank()) hosters += makeHoster(url, label)
-        }
-
-        return hosters.distinctBy { it.hosterUrl }
+        return document.select("iframe[src]")
+            .mapNotNull { iframe ->
+                val url = iframe.attr("abs:src").ifBlank { iframe.attr("src") }
+                if (url.isBlank() || url.isLikelyAdMedia()) null else makeHoster(url, "Primary")
+            }
+            .distinctBy { it.hosterUrl }
     }
 
     private fun makeHoster(url: String, label: String): Hoster {
@@ -254,11 +258,11 @@ class JavSubbed : AnimeHttpSource() {
         val urls = buildList {
             document.select("video[src], video source[src], source[src]").forEach { node ->
                 val src = node.attr("abs:src").ifBlank { node.attr("src") }
-                if (src.isDirectMedia()) add(src)
+                if (src.isDirectMedia() && !src.isLikelyAdMedia()) add(src)
             }
 
             MEDIA_REGEX.findAll(body).forEach { match ->
-                add(match.value.replace("\\/","/"))
+                match.value.replace("\\/","/").takeIf { !it.isLikelyAdMedia() }?.let(::add)
             }
         }.filter { it.isNotBlank() }.distinct()
 
@@ -279,10 +283,10 @@ class JavSubbed : AnimeHttpSource() {
         val urls = buildList {
             document.select("video[src], video source[src], source[src]").forEach { node ->
                 val src = node.attr("abs:src").ifBlank { node.attr("src") }
-                if (src.isDirectMedia()) add(src)
+                if (src.isDirectMedia() && !src.isLikelyAdMedia()) add(src)
             }
             MEDIA_REGEX.findAll(body).forEach { match ->
-                add(match.value.replace("\\/","/"))
+                match.value.replace("\\/","/").takeIf { !it.isLikelyAdMedia() }?.let(::add)
             }
         }.distinct()
 
@@ -297,6 +301,16 @@ class JavSubbed : AnimeHttpSource() {
     }
 
     override fun List<Video>.sortVideos(): List<Video> = this
+
+    private fun String.isLikelyAdMedia(): Boolean {
+        val value = lowercase()
+        return "javx.cc/player.mp4" in value ||
+            "/ads/" in value ||
+            "/ad/" in value ||
+            "preroll" in value ||
+            "pre-roll" in value ||
+            "vast" in value
+    }
 
     private fun String.isDirectMedia(): Boolean {
         val clean = substringBefore('?').lowercase()
