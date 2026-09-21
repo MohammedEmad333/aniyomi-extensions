@@ -175,6 +175,7 @@ class JavEnglish : AnimeHttpSource() {
         for (hoster in hosters) {
             if (!foundPlayable) {
                 val videos = extractProviderVideos(hoster, requestHeaders)
+                    .filter(::isPlayableVideo)
                 if (videos.isNotEmpty()) {
                     resolved += Hoster(
                         hosterUrl = hoster.hosterUrl,
@@ -294,6 +295,7 @@ class JavEnglish : AnimeHttpSource() {
 
             for (candidate in candidates) {
                 val videos = extractProviderVideos(candidate, pageHeaders)
+                    .filter(::isPlayableVideo)
                 if (videos.isNotEmpty()) return videos
             }
 
@@ -321,7 +323,10 @@ class JavEnglish : AnimeHttpSource() {
             .set("Referer", baseUrl)
             .build()
 
-        extractProviderVideos(hoster, hostHeaders).takeIf { it.isNotEmpty() }?.let { return it }
+        extractProviderVideos(hoster, hostHeaders)
+            .filter(::isPlayableVideo)
+            .takeIf { it.isNotEmpty() }
+            ?.let { return it }
 
         val response = client.newCall(GET(hoster.hosterUrl, hostHeaders)).awaitSuccess()
         return response.use { parseEmbeddedVideos(it, hoster, hostHeaders) }
@@ -384,7 +389,7 @@ class JavEnglish : AnimeHttpSource() {
                 headers = videoHeaders,
                 initialized = true,
             )
-        }
+        }.filter(::isPlayableVideo)
     }
 
     override fun videoListParse(response: Response, hoster: Hoster): List<Video> {
@@ -415,8 +420,44 @@ class JavEnglish : AnimeHttpSource() {
                 headers = videoHeaders,
                 initialized = true,
             )
-        }
+        }.filter(::isPlayableVideo)
     }
+
+    private fun isPlayableVideo(video: Video): Boolean = runCatching {
+        val requestHeaders = (video.headers ?: headers).newBuilder()
+            .set("Range", "bytes=0-2047")
+            .build()
+
+        client.newCall(GET(video.videoUrl, requestHeaders)).execute().use { response ->
+            if (!response.isSuccessful) return@use false
+
+            val contentType = response.header("Content-Type").orEmpty().lowercase()
+            if (
+                contentType.startsWith("video/") ||
+                "mpegurl" in contentType ||
+                "application/vnd.apple.mpegurl" in contentType ||
+                "application/x-mpegurl" in contentType
+            ) {
+                return@use true
+            }
+
+            val sample = response.body.bytes().take(2048).toByteArray()
+            if (sample.isEmpty()) return@use false
+
+            val text = sample.toString(Charsets.ISO_8859_1)
+            if (text.trimStart().startsWith("#EXTM3U")) return@use true
+
+            // MP4/ISO BMFF files normally contain an ftyp box near the beginning.
+            if ("ftyp" in text.take(64)) return@use true
+
+            // WebM/Matroska EBML signature.
+            sample.size >= 4 &&
+                sample[0] == 0x1A.toByte() &&
+                sample[1] == 0x45.toByte() &&
+                sample[2] == 0xDF.toByte() &&
+                sample[3] == 0xA3.toByte()
+        }
+    }.getOrDefault(false)
 
     override fun List<Video>.sortVideos(): List<Video> = this
 
