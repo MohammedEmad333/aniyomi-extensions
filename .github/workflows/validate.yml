@@ -163,8 +163,8 @@ jobs:
               json.dumps(
                   {
                       "meta": {
-                          "name": "MohammedEmad333 Aniyomi Extensions",
-                          "shortName": "mohammedemad333",
+                          "name": "Aniyomi Extensions",
+                          "shortName": "aniyomi-extensions",
                           "website": "https://github.com/MohammedEmad333/aniyomi-extensions",
                           "signingKeyFingerprint": fingerprint,
                       }

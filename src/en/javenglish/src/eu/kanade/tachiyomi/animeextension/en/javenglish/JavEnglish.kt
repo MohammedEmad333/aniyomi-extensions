@@ -157,23 +157,30 @@ class JavEnglish : AnimeHttpSource() {
         parseHosters(response.asJsoup())
 
     private fun parseHosters(document: Document): List<Hoster> {
-        val hosters = mutableListOf<Hoster>()
+        val sourceTabHosters = document
+            .select("#sourcetabs a[href], div#sourcetabs ul a[href]")
+            .mapNotNull { anchor ->
+                val url = anchor.attr("abs:href").ifBlank { anchor.attr("href") }
+                if (url.isBlank() || url.isLikelyAdMedia()) return@mapNotNull null
 
-        document.select("iframe[src]").forEach { iframe ->
-            val url = iframe.attr("abs:src").ifBlank { iframe.attr("src") }
-            if (url.isNotBlank()) hosters += makeHoster(url, "Primary")
-        }
-
-        document.select("#sourcetabs a[href], div#sourcetabs ul a[href]").forEach { anchor ->
-            val url = anchor.attr("abs:href").ifBlank { anchor.attr("href") }
-            if (url.isBlank()) return@forEach
-            val label = anchor.text().trim().ifBlank {
-                url.substringAfter("://").substringBefore("/")
+                val label = anchor.text().trim().ifBlank {
+                    url.substringAfter("://").substringBefore("/")
+                }
+                makeHoster(url, label)
             }
-            hosters += makeHoster(url, label)
-        }
+            .distinctBy { it.hosterUrl }
 
-        return hosters.distinctBy { it.hosterUrl }
+        // The page also contains an advertising iframe (currently javx.cc/player.mp4).
+        // Prefer the explicit "Watch Sources" links and only fall back to iframes when
+        // the site does not expose source tabs.
+        if (sourceTabHosters.isNotEmpty()) return sourceTabHosters
+
+        return document.select("iframe[src]")
+            .mapNotNull { iframe ->
+                val url = iframe.attr("abs:src").ifBlank { iframe.attr("src") }
+                if (url.isBlank() || url.isLikelyAdMedia()) null else makeHoster(url, "Primary")
+            }
+            .distinctBy { it.hosterUrl }
     }
 
     private fun makeHoster(url: String, label: String): Hoster {
@@ -233,10 +240,10 @@ class JavEnglish : AnimeHttpSource() {
         val mediaUrls = buildList {
             document.select("video[src], video source[src], source[src]").forEach { node ->
                 val src = node.attr("abs:src").ifBlank { node.attr("src") }
-                if (src.isDirectMedia()) add(src)
+                if (src.isDirectMedia() && !src.isLikelyAdMedia()) add(src)
             }
             MEDIA_REGEX.findAll(body).forEach { match ->
-                add(match.value.replace("\\/","/"))
+                match.value.replace("\\/","/").takeIf { !it.isLikelyAdMedia() }?.let(::add)
             }
         }.filter { it.isNotBlank() }.distinct()
 
@@ -269,14 +276,14 @@ class JavEnglish : AnimeHttpSource() {
         val mediaUrls = buildList {
             document.select("iframe[src]").forEach { iframe ->
                 val src = iframe.attr("abs:src")
-                if (src.isDirectMedia()) add(src)
+                if (src.isDirectMedia() && !src.isLikelyAdMedia()) add(src)
             }
             document.select("video[src], video source[src], source[src]").forEach { node ->
                 val src = node.attr("abs:src")
-                if (src.isDirectMedia()) add(src)
+                if (src.isDirectMedia() && !src.isLikelyAdMedia()) add(src)
             }
             MEDIA_REGEX.findAll(document.html()).forEach { match ->
-                add(match.value.replace("\\/","/"))
+                match.value.replace("\\/","/").takeIf { !it.isLikelyAdMedia() }?.let(::add)
             }
         }.distinct()
 
@@ -291,6 +298,16 @@ class JavEnglish : AnimeHttpSource() {
     }
 
     override fun List<Video>.sortVideos(): List<Video> = this
+
+    private fun String.isLikelyAdMedia(): Boolean {
+        val value = lowercase()
+        return "javx.cc/player.mp4" in value ||
+            "/ads/" in value ||
+            "/ad/" in value ||
+            "preroll" in value ||
+            "pre-roll" in value ||
+            "vast" in value
+    }
 
     private fun String.isDirectMedia(): Boolean {
         val clean = substringBefore('?').lowercase()
