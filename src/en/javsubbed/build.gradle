@@ -1,7 +1,7 @@
 ext {
     extName = 'JAVSubbed'
     extClass = '.JavSubbed'
-    extVersionCode = 1
+    extVersionCode = 2
     isNsfw = true
 }
 
