@@ -32,9 +32,28 @@ android {
         ]
     }
 
+    signingConfigs {
+        release {
+            def signingKeyPath = System.getenv("SIGNING_KEY_PATH")
+            def storePasswordValue = System.getenv("KEY_STORE_PASSWORD")
+            def keyAliasValue = System.getenv("ALIAS")
+            def keyPasswordValue = System.getenv("KEY_PASSWORD")
+
+            if (signingKeyPath && storePasswordValue && keyAliasValue && keyPasswordValue) {
+                storeFile file(signingKeyPath)
+                storePassword storePasswordValue
+                keyAlias keyAliasValue
+                keyPassword keyPasswordValue
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
+            if (System.getenv("SIGNING_KEY_PATH")) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 
