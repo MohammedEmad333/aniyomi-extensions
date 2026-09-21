@@ -154,7 +154,39 @@ class JavEnglish : AnimeHttpSource() {
 
     override suspend fun getHosterList(episode: SEpisode): List<Hoster> {
         val response = client.newCall(GET(baseUrl + episode.url, headers)).awaitSuccess()
-        return response.use { parseHosters(it.asJsoup()) }
+        val hosters = response.use { parseHosters(it.asJsoup()) }
+        if (hosters.isEmpty()) return emptyList()
+
+        val requestHeaders = headers.newBuilder()
+            .set("Referer", baseUrl)
+            .build()
+
+        val resolved = mutableListOf<Hoster>()
+        var foundPlayable = false
+
+        for (hoster in hosters) {
+            if (!foundPlayable) {
+                val videos = extractProviderVideos(hoster, requestHeaders)
+                if (videos.isNotEmpty()) {
+                    resolved += Hoster(
+                        hosterUrl = hoster.hosterUrl,
+                        hosterName = hoster.hosterName,
+                        videoList = videos,
+                        lazy = false,
+                    )
+                    foundPlayable = true
+                    continue
+                }
+            }
+
+            resolved += Hoster(
+                hosterUrl = hoster.hosterUrl,
+                hosterName = hoster.hosterName,
+                lazy = true,
+            )
+        }
+
+        return resolved
     }
 
     override fun seasonListParse(response: Response): List<SAnime> = emptyList()
@@ -183,6 +215,7 @@ class JavEnglish : AnimeHttpSource() {
                 makeHoster(url, label)
             }
             .distinctBy { it.hosterUrl }
+            .sortedBy { it.hosterUrl.providerPriority() }
 
         if (discovered.isNotEmpty()) return discovered
 
@@ -219,7 +252,7 @@ class JavEnglish : AnimeHttpSource() {
         return Hoster(
             hosterUrl = url,
             hosterName = label,
-            lazy = false,
+            lazy = true,
         )
     }
 
@@ -337,6 +370,17 @@ class JavEnglish : AnimeHttpSource() {
     }
 
     override fun List<Video>.sortVideos(): List<Video> = this
+
+    private fun String.providerPriority(): Int {
+        val value = lowercase()
+        return when {
+            "emturbovid." in value || "turbovid." in value -> 0
+            "dood" in value || "playmogo." in value -> 1
+            "streamtape." in value -> 2
+            "voe." in value -> 3
+            else -> 9
+        }
+    }
 
     private fun String.isKnownVideoHost(): Boolean {
         val value = lowercase()
