@@ -93,109 +93,100 @@ class VoeExtractor(private val client: OkHttpClient) {
         label: String = "VOE",
         requestHeaders: Headers = Headers.headersOf(),
     ): List<Video> = runCatching {
-        val response = client.newCall(GET(url, requestHeaders)).execute()
-        val finalUrl = response.request.url.toString()
-        val document = response.use { it.asJsoup() }
+        var response = client.newCall(GET(url, requestHeaders)).execute()
+        var finalUrl = response.request.url.toString()
+        var body = response.body.string()
 
-        val script = document.selectFirst(
-            "script:containsData(const sources), script:containsData(var sources), script:containsData(wc0)",
-        )?.data() ?: return@runCatching emptyList()
+        val redirect = Regex("""window\.location\.href\s*=\s*'([^']+)';""")
+            .find(body)
+            ?.groupValues
+            ?.getOrNull(1)
 
-        val playlistUrl = when {
-            script.contains("sources") -> {
-                val raw = script.substringAfter("hls': '", "").substringBefore("'")
-                if (raw.isBlank()) return@runCatching emptyList()
-                if (raw.startsWith("http")) {
-                    raw
-                } else {
-                    String(Base64.decode(raw, Base64.DEFAULT))
-                }
-            }
-            script.contains("wc0") -> {
-                val encoded = Regex("""'([^']{20,})'""")
-                    .find(script)
-                    ?.groupValues
-                    ?.getOrNull(1)
-                    ?: return@runCatching emptyList()
-
-                val decoded = String(Base64.decode(encoded, Base64.DEFAULT))
-                Regex("""["']file["']\s*:\s*["']([^"']+)["']""")
-                    .find(decoded)
-                    ?.groupValues
-                    ?.getOrNull(1)
-                    ?: return@runCatching emptyList()
-            }
-            else -> return@runCatching emptyList()
+        if (!redirect.isNullOrBlank()) {
+            response = client.newCall(GET(redirect, requestHeaders)).execute()
+            finalUrl = response.request.url.toString()
+            body = response.body.string()
         }
 
-        if (!playlistUrl.startsWith("http")) return@runCatching emptyList()
+        val encoded = Regex("""<script[^>]+type=["']application/json["'][^>]*>\s*\["([^"]+)"\]\s*</script>""")
+            .find(body)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?: return@runCatching emptyList()
+
+        val decrypted = decryptF7(encoded) ?: return@runCatching emptyList()
+        val source = Regex("""["']source["']\s*:\s*["']([^"']+)["']""")
+            .find(decrypted)
+            ?.groupValues
+            ?.getOrNull(1)
+        val direct = Regex("""["']direct_access_url["']\s*:\s*["']([^"']+)["']""")
+            .find(decrypted)
+            ?.groupValues
+            ?.getOrNull(1)
 
         val videoHeaders = requestHeaders.newBuilder()
             .set("Referer", finalUrl)
             .build()
 
-        listOf(
-            Video(
-                videoUrl = playlistUrl,
-                videoTitle = label,
-                headers = videoHeaders,
-                initialized = true,
-            ),
-        )
+        buildList {
+            source?.takeIf { it.startsWith("http") }?.let { media ->
+                add(Video(media, label, media, headers = videoHeaders))
+            }
+            direct?.takeIf { it.startsWith("http") }?.let { media ->
+                add(Video(media, "$label MP4", media, headers = videoHeaders))
+            }
+        }
     }.getOrDefault(emptyList())
+
+    private fun decryptF7(input: String): String? = runCatching {
+        val rot13 = input.map { ch ->
+            when (ch) {
+                in 'A'..'Z' -> ((ch - 'A' + 13) % 26 + 'A'.code).toChar()
+                in 'a'..'z' -> ((ch - 'a' + 13) % 26 + 'a'.code).toChar()
+                else -> ch
+            }
+        }.joinToString("")
+
+        val patterns = listOf("@$", "^^", "~@", "%?", "*~", "!!", "#&")
+        val cleaned = patterns.fold(rot13) { acc, pattern -> acc.replace(pattern, "_") }
+            .replace("_", "")
+
+        val step1 = String(Base64.decode(cleaned, Base64.DEFAULT), Charsets.ISO_8859_1)
+        val shifted = step1.map { (it.code - 3).toChar() }.joinToString("")
+        val reversed = shifted.reversed()
+        String(Base64.decode(reversed, Base64.DEFAULT), Charsets.ISO_8859_1)
+    }.getOrNull()
 }
 
 class TurboVidExtractor(private val client: OkHttpClient) {
 
     fun videosFromUrl(
         url: String,
-        label: String = "TurboVid",
+        label: String = "EmTurboVid",
         requestHeaders: Headers = Headers.headersOf(),
     ): List<Video> = runCatching {
         val response = client.newCall(GET(url, requestHeaders)).execute()
         val finalUrl = response.request.url.toString()
         val body = response.body.string()
 
-        val mediaUrls = linkedSetOf<String>()
+        val urlPlay = Regex("""urlPlay\s*=\s*['"]([^'"]+)""")
+            .find(body)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?: return@runCatching emptyList()
 
-        MEDIA_REGEX.findAll(body).forEach { match ->
-            mediaUrls += match.value.replace("\\/", "/")
-        }
+        if (!urlPlay.startsWith("http")) return@runCatching emptyList()
 
-        decodeCandidates(body).forEach { decoded ->
-            MEDIA_REGEX.findAll(decoded).forEach { match ->
-                mediaUrls += match.value.replace("\\/", "/")
-            }
-        }
+        val origin = runCatching {
+            val uri = URI(finalUrl)
+            "${uri.scheme}://${uri.host}"
+        }.getOrDefault(finalUrl)
 
         val videoHeaders = requestHeaders.newBuilder()
             .set("Referer", finalUrl)
+            .set("Origin", origin)
             .build()
 
-        mediaUrls
-            .filter { it.startsWith("http") }
-            .filterNot { it.contains("/ads/", ignoreCase = true) || it.contains("preroll", ignoreCase = true) }
-            .map { media ->
-                Video(
-                    videoUrl = media,
-                    videoTitle = label,
-                    headers = videoHeaders,
-                    initialized = true,
-                )
-            }
+        listOf(Video(urlPlay, label, urlPlay, headers = videoHeaders))
     }.getOrDefault(emptyList())
-
-    private companion object {
-        val MEDIA_REGEX = Regex(
-            """https?:\\?/\\?/[^"'<>\s]+?(?:\.m3u8|\.mp4|\.webm)(?:\?[^"'<>\s]*)?""",
-            RegexOption.IGNORE_CASE,
-        )
-    }
 }
-
-private fun decodeCandidates(body: String): Sequence<String> =
-    Regex("""[A-Za-z0-9+/]{40,}={0,2}""")
-        .findAll(body)
-        .mapNotNull { match ->
-            runCatching { String(Base64.decode(match.value, Base64.DEFAULT)) }.getOrNull()
-        }
