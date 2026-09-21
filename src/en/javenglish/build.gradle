@@ -1,7 +1,7 @@
 ext {
     extName = 'JAVEnglish'
     extClass = '.JavEnglish'
-    extVersionCode = 3
+    extVersionCode = 4
     isNsfw = true
 }
 
