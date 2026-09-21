@@ -100,6 +100,7 @@ jobs:
           python3 <<'PY'
           import hashlib
           import json
+          import re
           from pathlib import Path
 
           EXTENSIONS = {
@@ -127,13 +128,20 @@ jobs:
                   raise SystemExit(f"Unknown APK filename: {apk_file.name}")
 
               meta = EXTENSIONS[key]
+              gradle_file = Path("src/en") / key / "build.gradle"
+              gradle_text = gradle_file.read_text(encoding="utf-8")
+              match = re.search(r"extVersionCode\s*=\s*(\d+)", gradle_text)
+              if not match:
+                  raise SystemExit(f"Could not read extVersionCode from {gradle_file}")
+              version_code = int(match.group(1))
+
               data.append({
                   "name": meta["name"],
                   "pkg": meta["pkg"],
                   "apk": apk_file.name,
                   "lang": "en",
-                  "code": 1,
-                  "version": "17.1",
+                  "code": version_code,
+                  "version": f"17.{version_code}",
                   "nsfw": 1,
                   "hasReadme": 0,
                   "hasChangelog": 0,
@@ -142,7 +150,7 @@ jobs:
                       "lang": "en",
                       "id": meta["source_id"],
                       "baseUrl": meta["base_url"],
-                      "versionId": 1,
+                      "versionId": version_code,
                   }],
                   "size": apk_file.stat().st_size,
                   "sha256": hashlib.sha256(apk_file.read_bytes()).hexdigest(),
