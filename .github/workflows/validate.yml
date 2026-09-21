@@ -53,58 +53,73 @@ jobs:
         run: |
           set -euo pipefail
 
-          APK_PATH="$(find src -type f -path '*/build/outputs/apk/release/*.apk' | head -n 1)"
-          if [ -z "$APK_PATH" ]; then
-            echo "No APK found to publish."
+          mapfile -t APKS < <(find src -type f -path '*/build/outputs/apk/release/*.apk' | sort)
+          if [ ${#APKS[@]} -eq 0 ]; then
+            echo "No APKs found to publish."
             exit 1
           fi
-
-          APK_NAME="$(basename "$APK_PATH")"
-          echo "Publishing $APK_NAME"
 
           git fetch origin repo
           git worktree add publish repo
 
           find publish -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
           mkdir -p publish/apk
-          cp "$APK_PATH" "publish/apk/$APK_NAME"
 
-          export APK_NAME
-          export APK_FILE="publish/apk/$APK_NAME"
+          for apk in "${APKS[@]}"; do
+            cp "$apk" publish/apk/
+          done
 
           python3 <<'PY'
           import hashlib
           import json
-          import os
           from pathlib import Path
 
-          apk_name = os.environ["APK_NAME"]
-          apk_file = Path(os.environ["APK_FILE"])
-
-          item = {
-              "name": "Aniyomi: JAVEnglish",
-              "pkg": "eu.kanade.tachiyomi.animeextension.en.javenglish",
-              "apk": apk_name,
-              "lang": "en",
-              "code": 1,
-              "version": "17.1",
-              "nsfw": 1,
-              "hasReadme": 0,
-              "hasChangelog": 0,
-              "sources": [
-                  {
-                      "name": "JAVEnglish",
-                      "lang": "en",
-                      "id": "1912024392600497429",
-                      "baseUrl": "https://javenglish.cc",
-                      "versionId": 1
-                  }
-              ],
-              "size": apk_file.stat().st_size,
-              "sha256": hashlib.sha256(apk_file.read_bytes()).hexdigest()
+          EXTENSIONS = {
+              "javenglish": {
+                  "name": "Aniyomi: JAVEnglish",
+                  "pkg": "eu.kanade.tachiyomi.animeextension.en.javenglish",
+                  "source_name": "JAVEnglish",
+                  "source_id": "1912024392600497429",
+                  "base_url": "https://javenglish.cc",
+              },
+              "javsubbed": {
+                  "name": "Aniyomi: JAVSubbed",
+                  "pkg": "eu.kanade.tachiyomi.animeextension.en.javsubbed",
+                  "source_name": "JAVSubbed",
+                  "source_id": "9192959167101688940",
+                  "base_url": "https://javsubbed.net",
+              },
           }
 
-          data = [item]
+          data = []
+          for apk_file in sorted(Path("publish/apk").glob("*.apk")):
+              lower = apk_file.name.lower()
+              key = next((k for k in EXTENSIONS if k in lower), None)
+              if not key:
+                  raise SystemExit(f"Unknown APK filename: {apk_file.name}")
+
+              meta = EXTENSIONS[key]
+              data.append({
+                  "name": meta["name"],
+                  "pkg": meta["pkg"],
+                  "apk": apk_file.name,
+                  "lang": "en",
+                  "code": 1,
+                  "version": "17.1",
+                  "nsfw": 1,
+                  "hasReadme": 0,
+                  "hasChangelog": 0,
+                  "sources": [{
+                      "name": meta["source_name"],
+                      "lang": "en",
+                      "id": meta["source_id"],
+                      "baseUrl": meta["base_url"],
+                      "versionId": 1,
+                  }],
+                  "size": apk_file.stat().st_size,
+                  "sha256": hashlib.sha256(apk_file.read_bytes()).hexdigest(),
+              })
+
           Path("publish/index.json").write_text(
               json.dumps(data, indent=2, ensure_ascii=False) + "\n",
               encoding="utf-8",
@@ -119,7 +134,7 @@ jobs:
                       "meta": {
                           "name": "MohammedEmad333 Aniyomi Extensions",
                           "shortName": "mohammedemad333",
-                          "website": "https://github.com/MohammedEmad333/aniyomi-extensions"
+                          "website": "https://github.com/MohammedEmad333/aniyomi-extensions",
                       }
                   },
                   indent=2,
