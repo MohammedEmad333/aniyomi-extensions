@@ -162,7 +162,7 @@ class TurboVidExtractor(private val client: OkHttpClient) {
             mediaUrls += match.value.replace("\\/", "/")
         }
 
-        Base64.decodeCandidates(body).forEach { decoded ->
+        decodeCandidates(body).forEach { decoded ->
             MEDIA_REGEX.findAll(decoded).forEach { match ->
                 mediaUrls += match.value.replace("\\/", "/")
             }
@@ -193,9 +193,9 @@ class TurboVidExtractor(private val client: OkHttpClient) {
     }
 }
 
-private fun Base64.decodeCandidates(body: String): Sequence<String> =
+private fun decodeCandidates(body: String): Sequence<String> =
     Regex("""[A-Za-z0-9+/]{40,}={0,2}""")
         .findAll(body)
         .mapNotNull { match ->
-            runCatching { String(decode(match.value, DEFAULT)) }.getOrNull()
+            runCatching { String(Base64.decode(match.value, Base64.DEFAULT)) }.getOrNull()
         }
