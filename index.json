@@ -2,10 +2,10 @@
   {
     "name": "Aniyomi: JAVEnglish",
     "pkg": "eu.kanade.tachiyomi.animeextension.en.javenglish",
-    "apk": "aniyomi-en.javenglish-v17.6-release.apk",
+    "apk": "aniyomi-en.javenglish-v17.7-release.apk",
     "lang": "en",
-    "code": 6,
-    "version": "17.6",
+    "code": 7,
+    "version": "17.7",
     "nsfw": 1,
     "hasReadme": 0,
     "hasChangelog": 0,
@@ -15,19 +15,19 @@
         "lang": "en",
         "id": "1912024392600497429",
         "baseUrl": "https://javenglish.cc",
-        "versionId": 6
+        "versionId": 7
       }
     ],
-    "size": 26434,
-    "sha256": "8b3d9a9dc8002019aba067d5cfbc4e8b92149898b37430c2b74e5eb2dee3f8d2"
+    "size": 26937,
+    "sha256": "1e2d65771e772340ce84c6c8f1a00819d628f503337762afec55e9e590a8afd1"
   },
   {
     "name": "Aniyomi: JAVSubbed",
     "pkg": "eu.kanade.tachiyomi.animeextension.en.javsubbed",
-    "apk": "aniyomi-en.javsubbed-v17.6-release.apk",
+    "apk": "aniyomi-en.javsubbed-v17.7-release.apk",
     "lang": "en",
-    "code": 6,
-    "version": "17.6",
+    "code": 7,
+    "version": "17.7",
     "nsfw": 1,
     "hasReadme": 0,
     "hasChangelog": 0,
@@ -37,10 +37,10 @@
         "lang": "en",
         "id": "9192959167101688940",
         "baseUrl": "https://javsubbed.net",
-        "versionId": 6
+        "versionId": 7
       }
     ],
-    "size": 26736,
-    "sha256": "b67823e0859998a30f88032eb57e114e39fa0693c42f9a7851c7b90a3c2f32e8"
+    "size": 27201,
+    "sha256": "4fe264bce8b202bebac03998ee4990ae67f61c98d8717eb7fbd7cf50eff40f14"
   }
 ]
