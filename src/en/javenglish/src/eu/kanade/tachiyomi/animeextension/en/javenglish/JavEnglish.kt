@@ -195,38 +195,55 @@ class JavEnglish : AnimeHttpSource() {
         parseHosters(response.asJsoup())
 
     private fun parseHosters(document: Document): List<Hoster> {
-        val discovered = document.select("a[href]")
+        val sourceAnchors = document.select(
+            "#sourcetabs a[href], div#sourcetabs a[href], a[href]",
+        )
+
+        val discovered = sourceAnchors
             .mapNotNull { anchor ->
                 val url = anchor.attr("abs:href").ifBlank { anchor.attr("href") }
-                if (url.isBlank() || url.isLikelyAdMedia() || !url.isKnownVideoHost()) {
+                val label = anchor.text().trim()
+                val looksLikeStream = label.startsWith("Stream", ignoreCase = true) ||
+                    label.contains("Watch", ignoreCase = true)
+
+                if (url.isBlank() || url.isLikelyAdMedia()) {
                     return@mapNotNull null
                 }
 
-                val label = anchor.text().trim().ifBlank {
+                if (!looksLikeStream && !url.isKnownVideoHost()) {
+                    return@mapNotNull null
+                }
+
+                val name = label.ifBlank {
                     when {
                         "streamtape" in url.lowercase() -> "StreamTape"
                         "voe." in url.lowercase() -> "VOE"
                         "dood" in url.lowercase() || "playmogo" in url.lowercase() -> "DoodStream"
                         "turbovid" in url.lowercase() -> "TurboVid"
-                        else -> url.substringAfter("://").substringBefore("/")
+                        else -> url.substringAfter("://").substringBefore("/").ifBlank { "Stream" }
                     }
                 }
 
-                makeHoster(url, label)
+                makeHoster(url, name)
             }
             .distinctBy { it.hosterUrl }
             .sortedBy { it.hosterUrl.providerPriority() }
 
         if (discovered.isNotEmpty()) return discovered
 
-        // Fallback for sites that move provider URLs into iframe elements.
+        // Some titles expose only an iframe or use a provider domain we have not seen before.
+        // Keep any non-ad HTTP iframe as a last-resort hoster and let the generic parser inspect it.
         return document.select("iframe[src]")
             .mapNotNull { iframe ->
                 val url = iframe.attr("abs:src").ifBlank { iframe.attr("src") }
-                if (url.isBlank() || url.isLikelyAdMedia() || !url.isKnownVideoHost()) {
+                if (
+                    url.isBlank() ||
+                    url.isLikelyAdMedia() ||
+                    (!url.startsWith("http://") && !url.startsWith("https://"))
+                ) {
                     null
                 } else {
-                    makeHoster(url, "Primary")
+                    makeHoster(url, url.substringAfter("://").substringBefore("/").ifBlank { "Stream" })
                 }
             }
             .distinctBy { it.hosterUrl }
