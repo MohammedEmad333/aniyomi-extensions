@@ -249,7 +249,7 @@ class JavSubbed : AnimeHttpSource() {
                 makeHoster(url, name)
             }
             .distinctBy { it.hosterUrl }
-            .sortedBy { it.hosterUrl.providerPriority() }
+            .sortedBy { it.providerPriority() }
 
         if (discovered.isNotEmpty()) return discovered
 
@@ -323,12 +323,14 @@ class JavSubbed : AnimeHttpSource() {
         val url = hoster.hosterUrl
         val host = runCatching { java.net.URI(url).host.orEmpty().lowercase() }.getOrDefault("")
 
+        val name = hoster.hosterName.lowercase()
+
         return when {
+            "streamds" in name || "dood" in host || "playmogo" in host -> DoodExtractor(client)
+                .videosFromUrl(url, hoster.hosterName.ifBlank { "StreamDS" })
+
             "streamtape" in host -> StreamTapeExtractor(client)
                 .videosFromUrl(url, hoster.hosterName.ifBlank { "StreamTape" })
-
-            "dood" in host || "playmogo" in host -> DoodExtractor(client)
-                .videosFromUrl(url, hoster.hosterName.ifBlank { "DoodStream" })
 
             "voe" in host -> VoeExtractor(client)
                 .videosFromUrl(url, hoster.hosterName.ifBlank { "VOE" }, requestHeaders)
@@ -395,13 +397,15 @@ class JavSubbed : AnimeHttpSource() {
 
     override fun List<Video>.sortVideos(): List<Video> = this
 
-    private fun String.providerPriority(): Int {
-        val value = lowercase()
+    private fun Hoster.providerPriority(): Int {
+        val name = hosterName.lowercase()
+        val value = hosterUrl.lowercase()
         return when {
-            "dood" in value || "playmogo." in value -> 0
-            "streamtape." in value -> 1
-            "voe." in value -> 2
-            "emturbovid." in value || "turbovid." in value -> 3
+            "streamds" in name -> 0
+            "dood" in value || "playmogo." in value -> 1
+            "streamtape." in value -> 2
+            "voe." in value -> 3
+            "emturbovid." in value || "turbovid." in value -> 4
             else -> 9
         }
     }
