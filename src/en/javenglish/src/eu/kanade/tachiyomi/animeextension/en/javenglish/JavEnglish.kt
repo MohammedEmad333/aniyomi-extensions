@@ -25,6 +25,7 @@ class JavEnglish : AnimeHttpSource() {
     override val baseUrl = "https://javenglish.cc"
     override val lang = "en"
     override val supportsLatest = true
+    override val supportsRelatedAnimes = false
 
     override fun headersBuilder(): Headers.Builder = super.headersBuilder()
         .set("Referer", "$baseUrl/")
@@ -288,6 +289,8 @@ class JavEnglish : AnimeHttpSource() {
             )
         }
     }
+
+    override fun List<Video>.sortVideos(): List<Video> = this
 
     private fun String.isDirectMedia(): Boolean {
         val clean = substringBefore('?').lowercase()
