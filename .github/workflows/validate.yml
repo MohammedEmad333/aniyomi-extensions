@@ -30,3 +30,11 @@ jobs:
             exit 0
           fi
           gradle assembleRelease
+      - name: Upload APK artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aniyomi-extension-apks
+          path: src/**/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
