@@ -155,7 +155,15 @@ class JavEnglish : AnimeHttpSource() {
     override suspend fun getHosterList(episode: SEpisode): List<Hoster> {
         val response = client.newCall(GET(baseUrl + episode.url, headers)).awaitSuccess()
         val hosters = response.use { parseHosters(it.asJsoup()) }
-        if (hosters.isEmpty()) return emptyList()
+        if (hosters.isEmpty()) {
+            return listOf(
+                Hoster(
+                    hosterUrl = baseUrl + episode.url,
+                    hosterName = "Page fallback",
+                    lazy = false,
+                ),
+            )
+        }
 
         val requestHeaders = headers.newBuilder()
             .set("Referer", baseUrl)
@@ -275,6 +283,28 @@ class JavEnglish : AnimeHttpSource() {
 
     override suspend fun getVideoList(hoster: Hoster): List<Video> {
         hoster.videoList?.let { return it }
+
+        if (hoster.hosterUrl.startsWith(baseUrl)) {
+            val pageHeaders = headers.newBuilder()
+                .set("Referer", baseUrl)
+                .build()
+            val response = client.newCall(GET(hoster.hosterUrl, pageHeaders)).awaitSuccess()
+            val document = response.use { it.asJsoup() }
+            val candidates = parseHosters(document)
+
+            for (candidate in candidates) {
+                val videos = extractProviderVideos(candidate, pageHeaders)
+                if (videos.isNotEmpty()) return videos
+            }
+
+            val synthetic = Hoster(
+                hosterUrl = hoster.hosterUrl,
+                hosterName = hoster.hosterName,
+                lazy = false,
+            )
+            val retry = client.newCall(GET(hoster.hosterUrl, pageHeaders)).awaitSuccess()
+            return retry.use { parseEmbeddedVideos(it, synthetic, pageHeaders) }
+        }
 
         if (hoster.hosterUrl.isDirectMedia()) {
             return listOf(
