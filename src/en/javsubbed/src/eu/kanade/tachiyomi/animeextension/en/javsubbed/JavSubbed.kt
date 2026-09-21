@@ -241,7 +241,7 @@ class JavSubbed : AnimeHttpSource() {
         return Hoster(
             hosterUrl = url,
             hosterName = label,
-            lazy = true,
+            lazy = false,
         )
     }
 
