@@ -381,10 +381,10 @@ class JavSubbed : AnimeHttpSource() {
     private fun String.providerPriority(): Int {
         val value = lowercase()
         return when {
-            "emturbovid." in value || "turbovid." in value -> 0
-            "dood" in value || "playmogo." in value -> 1
-            "streamtape." in value -> 2
-            "voe." in value -> 3
+            "dood" in value || "playmogo." in value -> 0
+            "streamtape." in value -> 1
+            "voe." in value -> 2
+            "emturbovid." in value || "turbovid." in value -> 3
             else -> 9
         }
     }
