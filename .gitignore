@@ -1,9 +1,0 @@
-.gradle/
-**/build/
-local.properties
-signingkey.jks
-*.jks
-*.keystore
-.idea/
-.DS_Store
-repo/apk/*.apk
