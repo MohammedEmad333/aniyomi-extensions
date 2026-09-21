@@ -24,10 +24,10 @@
   {
     "name": "Aniyomi: JAVSubbed",
     "pkg": "eu.kanade.tachiyomi.animeextension.en.javsubbed",
-    "apk": "aniyomi-en.javsubbed-v17.9-release.apk",
+    "apk": "aniyomi-en.javsubbed-v17.8-release.apk",
     "lang": "en",
-    "code": 9,
-    "version": "17.9",
+    "code": 8,
+    "version": "17.8",
     "nsfw": 1,
     "hasReadme": 0,
     "hasChangelog": 0,
@@ -37,10 +37,10 @@
         "lang": "en",
         "id": "9192959167101688940",
         "baseUrl": "https://javsubbed.net",
-        "versionId": 9
+        "versionId": 8
       }
     ],
-    "size": 27364,
-    "sha256": "ad06c1b2c9cc906aa9030e37c834aa12f318c5684d75e0c1698e211a56f21ba8"
+    "size": 27362,
+    "sha256": "0cfa7621fe34bc2bc77928cb63c275e8e3c902bd5735cac8c0b47b3ee5b0e33f"
   }
 ]
