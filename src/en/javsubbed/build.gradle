@@ -1,0 +1,8 @@
+ext {
+    extName = 'JAVSubbed'
+    extClass = '.JavSubbed'
+    extVersionCode = 1
+    isNsfw = true
+}
+
+apply from: "$rootDir/common.gradle"
