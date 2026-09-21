@@ -25,7 +25,6 @@ class JavEnglish : AnimeHttpSource() {
     override val baseUrl = "https://javenglish.cc"
     override val lang = "en"
     override val supportsLatest = true
-    override val supportsRelatedAnime = false
 
     override fun headersBuilder(): Headers.Builder = super.headersBuilder()
         .set("Referer", "$baseUrl/")
@@ -151,6 +150,11 @@ class JavEnglish : AnimeHttpSource() {
         return response.use { parseHosters(it.asJsoup()) }
     }
 
+    override fun seasonListParse(response: Response): List<SAnime> = emptyList()
+
+    override fun hosterListParse(response: Response): List<Hoster> =
+        parseHosters(response.asJsoup())
+
     private fun parseHosters(document: Document): List<Hoster> {
         val hosters = mutableListOf<Hoster>()
 
@@ -254,9 +258,9 @@ class JavEnglish : AnimeHttpSource() {
         }
     }
 
-    override fun videoListParse(response: Response): List<Video> {
+    override fun videoListParse(response: Response, hoster: Hoster): List<Video> {
         val document = response.asJsoup()
-        val referer = document.location()
+        val referer = hoster.hosterUrl.ifBlank { document.location() }
         val videoHeaders = headers.newBuilder()
             .set("Referer", referer)
             .build()
