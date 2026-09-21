@@ -1,4 +1,4 @@
-name: Validate
+name: Validate and Publish
 
 on:
   push:
@@ -6,20 +6,27 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   gradle:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.4'
+
       - name: Validate Gradle project
         run: gradle projects
+
       - name: Build extension APKs
         shell: bash
         run: |
@@ -30,6 +37,7 @@ jobs:
             exit 0
           fi
           gradle assembleRelease
+
       - name: Upload APK artifacts
         if: success()
         uses: actions/upload-artifact@v4
@@ -38,3 +46,98 @@ jobs:
           path: src/**/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish Aniyomi repository
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APK_PATH="$(find src -type f -path '*/build/outputs/apk/release/*.apk' | head -n 1)"
+          if [ -z "$APK_PATH" ]; then
+            echo "No APK found to publish."
+            exit 1
+          fi
+
+          APK_NAME="$(basename "$APK_PATH")"
+          echo "Publishing $APK_NAME"
+
+          git fetch origin repo
+          git worktree add publish repo
+
+          find publish -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          mkdir -p publish/apk
+          cp "$APK_PATH" "publish/apk/$APK_NAME"
+
+          export APK_NAME
+          export APK_FILE="publish/apk/$APK_NAME"
+
+          python3 <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          apk_name = os.environ["APK_NAME"]
+          apk_file = Path(os.environ["APK_FILE"])
+
+          item = {
+              "name": "Aniyomi: JAVEnglish",
+              "pkg": "eu.kanade.tachiyomi.animeextension.en.javenglish",
+              "apk": apk_name,
+              "lang": "en",
+              "code": 1,
+              "version": "17.1",
+              "nsfw": 1,
+              "hasReadme": 0,
+              "hasChangelog": 0,
+              "sources": [
+                  {
+                      "name": "JAVEnglish",
+                      "lang": "en",
+                      "id": "1912024392600497429",
+                      "baseUrl": "https://javenglish.cc",
+                      "versionId": 1
+                  }
+              ],
+              "size": apk_file.stat().st_size,
+              "sha256": hashlib.sha256(apk_file.read_bytes()).hexdigest()
+          }
+
+          data = [item]
+          Path("publish/index.json").write_text(
+              json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+              encoding="utf-8",
+          )
+          Path("publish/index.min.json").write_text(
+              json.dumps(data, separators=(",", ":"), ensure_ascii=False) + "\n",
+              encoding="utf-8",
+          )
+          Path("publish/repo.json").write_text(
+              json.dumps(
+                  {
+                      "meta": {
+                          "name": "MohammedEmad333 Aniyomi Extensions",
+                          "shortName": "mohammedemad333",
+                          "website": "https://github.com/MohammedEmad333/aniyomi-extensions"
+                      }
+                  },
+                  indent=2,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          cat > publish/README.md <<'EOF'
+          # Aniyomi Extensions Repository
+
+          Add this URL to Aniyomi:
+
+          https://raw.githubusercontent.com/MohammedEmad333/aniyomi-extensions/repo/index.min.json
+          EOF
+
+          git -C publish config user.name "github-actions[bot]"
+          git -C publish config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C publish add -A
+          git -C publish commit -m "Publish Aniyomi repository" || true
+          git -C publish push origin repo
