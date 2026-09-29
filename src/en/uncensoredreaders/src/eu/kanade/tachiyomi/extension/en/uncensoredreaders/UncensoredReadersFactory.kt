@@ -32,7 +32,7 @@ private abstract class GenericUncensoredSource : HttpSource() {
 
     final override val lang = "en"
     final override val supportsLatest = true
-    override val client = network.cloudflareClient
+    override val client = network.client
 
     protected abstract val seriesPrefixes: List<String>
 
