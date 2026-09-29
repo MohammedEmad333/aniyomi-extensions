@@ -167,6 +167,9 @@ private abstract class GenericUncensoredSource : HttpSource() {
             )
     }
 
+    override fun imageUrlParse(response: Response): String =
+        throw UnsupportedOperationException("Direct image URLs are provided by pageListParse")
+
     override fun pageListParse(response: Response): List<Page> {
         val document = response.asJsoup()
 
