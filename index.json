@@ -2,10 +2,10 @@
   {
     "name": "Aniyomi: JAVEnglish",
     "pkg": "eu.kanade.tachiyomi.animeextension.en.javenglish",
-    "apk": "aniyomi-en.javenglish-v17.11-release.apk",
+    "apk": "aniyomi-en.javenglish-v17.12-release.apk",
     "lang": "en",
-    "code": 11,
-    "version": "17.11",
+    "code": 12,
+    "version": "17.12",
     "nsfw": 1,
     "hasReadme": 0,
     "hasChangelog": 0,
@@ -15,19 +15,19 @@
         "lang": "en",
         "id": "1912024392600497429",
         "baseUrl": "https://javenglish.cc",
-        "versionId": 11
+        "versionId": 12
       }
     ],
-    "size": 27699,
-    "sha256": "74c1335ee4611c9c014b0d2391f75e8799e8aa892096c1fdac48f512bcd8d21a"
+    "size": 28738,
+    "sha256": "efc6268f3a1e14f83b6b4beb03721ac634b60cb5cadb1c8809f8c3fdabcfa644"
   },
   {
     "name": "Aniyomi: JAVSubbed",
     "pkg": "eu.kanade.tachiyomi.animeextension.en.javsubbed",
-    "apk": "aniyomi-en.javsubbed-v17.11-release.apk",
+    "apk": "aniyomi-en.javsubbed-v17.12-release.apk",
     "lang": "en",
-    "code": 11,
-    "version": "17.11",
+    "code": 12,
+    "version": "17.12",
     "nsfw": 1,
     "hasReadme": 0,
     "hasChangelog": 0,
@@ -37,10 +37,60 @@
         "lang": "en",
         "id": "9192959167101688940",
         "baseUrl": "https://javsubbed.net",
-        "versionId": 11
+        "versionId": 12
       }
     ],
-    "size": 28006,
-    "sha256": "e04fd668977abf60167cf5b7713586e18df266806609a1c2fcf030bf52ac10c3"
+    "size": 28940,
+    "sha256": "74bf125076f22382c91d31b3762abc4340129c351c0fd40b4518b1258e76ffac"
+  },
+  {
+    "name": "Manga: Uncensored Readers",
+    "pkg": "eu.kanade.tachiyomi.extension.en.uncensoredreaders",
+    "apk": "manga-en.uncensoredreaders-v1.4.1-release.apk",
+    "lang": "en",
+    "code": 1,
+    "version": "1.4.1",
+    "nsfw": 1,
+    "hasReadme": 0,
+    "hasChangelog": 0,
+    "sources": [
+      {
+        "name": "Hasbic",
+        "lang": "en",
+        "id": "2844254863066184581",
+        "baseUrl": "https://hasbicmanhwa.com",
+        "versionId": 1
+      },
+      {
+        "name": "ToonCraze",
+        "lang": "en",
+        "id": "7661901217790392078",
+        "baseUrl": "https://tooncraze.com",
+        "versionId": 1
+      },
+      {
+        "name": "Yomowa",
+        "lang": "en",
+        "id": "7444097240594294135",
+        "baseUrl": "https://yomowa.com",
+        "versionId": 1
+      },
+      {
+        "name": "MangaHe",
+        "lang": "en",
+        "id": "1659239847291127359",
+        "baseUrl": "https://mangahe.com",
+        "versionId": 1
+      },
+      {
+        "name": "Manga Sin Censura",
+        "lang": "en",
+        "id": "5762561096423582212",
+        "baseUrl": "https://mangasincensura.com",
+        "versionId": 1
+      }
+    ],
+    "size": 19622,
+    "sha256": "6c7ab06d9c34eed7e6f5979e49af9f7f5a10892cfb03b6e6623fcde5a13a5e91"
   }
 ]
