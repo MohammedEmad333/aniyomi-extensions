@@ -1,0 +1,95 @@
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlinx-serialization'
+apply plugin: 'org.jmailen.gradle.kotlinter'
+
+android {
+    compileSdkVersion AndroidConfig.compileSdk
+    namespace AndroidConfig.mangaNamespace
+
+    sourceSets {
+        main {
+            manifest.srcFile "AndroidManifest.xml"
+            java.srcDirs = ['src']
+            res.srcDirs = ['res']
+        }
+    }
+
+    defaultConfig {
+        minSdkVersion AndroidConfig.minSdk
+        targetSdkVersion AndroidConfig.targetSdk
+        applicationIdSuffix project.parent.name + "." + project.name
+        versionCode extVersionCode
+        versionName "1.4.$versionCode"
+        base {
+            archivesName = "manga-$applicationIdSuffix-v$versionName"
+        }
+        assert extClass.startsWith(".")
+        manifestPlaceholders = [
+            appName : "Manga: $extName",
+            extClass: extClass,
+            nsfw    : project.ext.find("isNsfw") ? 1 : 0,
+        ]
+    }
+
+    signingConfigs {
+        release {
+            def signingKeyPath = System.getenv("SIGNING_KEY_PATH")
+            def storePasswordValue = System.getenv("KEY_STORE_PASSWORD")
+            def keyAliasValue = System.getenv("ALIAS")
+            def keyPasswordValue = System.getenv("KEY_PASSWORD")
+
+            if (signingKeyPath && storePasswordValue && keyAliasValue && keyPasswordValue) {
+                storeFile file(signingKeyPath)
+                storePassword storePasswordValue
+                keyAlias keyAliasValue
+                keyPassword keyPasswordValue
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (System.getenv("SIGNING_KEY_PATH")) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    dependenciesInfo {
+        includeInApk = false
+    }
+
+    buildFeatures {
+        aidl false
+        renderScript false
+        resValues false
+        shaders false
+        buildConfig true
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    implementation(project(":manga-core"))
+    compileOnly(libs.bundles.manga.common)
+}
+
+tasks.register("writeManifestFile") {
+    doLast {
+        def manifest = android.sourceSets.getByName("main").manifest
+        if (!manifest.srcFile.exists()) {
+            File tempFile = layout.buildDirectory.get().file("tempAndroidManifest.xml").getAsFile()
+            tempFile.parentFile.mkdirs()
+            tempFile.text = '<?xml version="1.0" encoding="utf-8"?><manifest />'
+            manifest.srcFile(tempFile.path)
+        }
+    }
+}
+
+preBuild.dependsOn(writeManifestFile)
