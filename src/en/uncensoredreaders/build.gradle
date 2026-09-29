@@ -1,0 +1,8 @@
+ext {
+    extName = 'Uncensored Readers'
+    extClass = '.UncensoredReadersFactory'
+    extVersionCode = 1
+    isNsfw = true
+}
+
+apply from: "$rootDir/common-manga.gradle"

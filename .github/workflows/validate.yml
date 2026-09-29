@@ -111,16 +111,64 @@ jobs:
               "javenglish": {
                   "name": "Aniyomi: JAVEnglish",
                   "pkg": "eu.kanade.tachiyomi.animeextension.en.javenglish",
-                  "source_name": "JAVEnglish",
-                  "source_id": "1912024392600497429",
-                  "base_url": "https://javenglish.cc",
+                  "version_prefix": "17",
+                  "nsfw": 1,
+                  "sources": [{
+                      "name": "JAVEnglish",
+                      "lang": "en",
+                      "id": "1912024392600497429",
+                      "baseUrl": "https://javenglish.cc",
+                  }],
               },
               "javsubbed": {
                   "name": "Aniyomi: JAVSubbed",
                   "pkg": "eu.kanade.tachiyomi.animeextension.en.javsubbed",
-                  "source_name": "JAVSubbed",
-                  "source_id": "9192959167101688940",
-                  "base_url": "https://javsubbed.net",
+                  "version_prefix": "17",
+                  "nsfw": 1,
+                  "sources": [{
+                      "name": "JAVSubbed",
+                      "lang": "en",
+                      "id": "9192959167101688940",
+                      "baseUrl": "https://javsubbed.net",
+                  }],
+              },
+              "uncensoredreaders": {
+                  "name": "Manga: Uncensored Readers",
+                  "pkg": "eu.kanade.tachiyomi.extension.en.uncensoredreaders",
+                  "version_prefix": "1.4",
+                  "nsfw": 1,
+                  "sources": [
+                      {
+                          "name": "Hasbic",
+                          "lang": "en",
+                          "id": "2844254863066184581",
+                          "baseUrl": "https://hasbicmanhwa.com",
+                      },
+                      {
+                          "name": "ToonCraze",
+                          "lang": "en",
+                          "id": "7661901217790392078",
+                          "baseUrl": "https://tooncraze.com",
+                      },
+                      {
+                          "name": "Yomowa",
+                          "lang": "en",
+                          "id": "7444097240594294135",
+                          "baseUrl": "https://yomowa.com",
+                      },
+                      {
+                          "name": "MangaHe",
+                          "lang": "en",
+                          "id": "1659239847291127359",
+                          "baseUrl": "https://mangahe.com",
+                      },
+                      {
+                          "name": "Manga Sin Censura",
+                          "lang": "en",
+                          "id": "5762561096423582212",
+                          "baseUrl": "https://mangasincensura.com",
+                      },
+                  ],
               },
           }
 
@@ -139,23 +187,22 @@ jobs:
                   raise SystemExit(f"Could not read extVersionCode from {gradle_file}")
               version_code = int(match.group(1))
 
+              sources = [
+                  {**source, "versionId": version_code}
+                  for source in meta["sources"]
+              ]
+
               data.append({
                   "name": meta["name"],
                   "pkg": meta["pkg"],
                   "apk": apk_file.name,
                   "lang": "en",
                   "code": version_code,
-                  "version": f"17.{version_code}",
-                  "nsfw": 1,
+                  "version": f"{meta['version_prefix']}.{version_code}",
+                  "nsfw": meta["nsfw"],
                   "hasReadme": 0,
                   "hasChangelog": 0,
-                  "sources": [{
-                      "name": meta["source_name"],
-                      "lang": "en",
-                      "id": meta["source_id"],
-                      "baseUrl": meta["base_url"],
-                      "versionId": version_code,
-                  }],
+                  "sources": sources,
                   "size": apk_file.stat().st_size,
                   "sha256": hashlib.sha256(apk_file.read_bytes()).hexdigest(),
               })

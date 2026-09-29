@@ -430,6 +430,39 @@ class JavSubbed : AnimeHttpSource() {
         }
     }
 
+    private fun isPlayableVideo(video: Video): Boolean = runCatching {
+        val requestHeaders = (video.headers ?: headers).newBuilder()
+            .set("Range", "bytes=0-2047")
+            .build()
+
+        client.newCall(GET(video.videoUrl, requestHeaders)).execute().use { response ->
+            if (!response.isSuccessful) return@use false
+
+            val contentType = response.header("Content-Type").orEmpty().lowercase()
+            if (
+                contentType.startsWith("video/") ||
+                "mpegurl" in contentType ||
+                "application/vnd.apple.mpegurl" in contentType ||
+                "application/x-mpegurl" in contentType
+            ) {
+                return@use true
+            }
+
+            val sample = response.body.bytes().take(2048).toByteArray()
+            if (sample.isEmpty()) return@use false
+
+            val text = sample.toString(Charsets.ISO_8859_1)
+            if (text.trimStart().startsWith("#EXTM3U")) return@use true
+            if ("ftyp" in text.take(64)) return@use true
+
+            sample.size >= 4 &&
+                sample[0] == 0x1A.toByte() &&
+                sample[1] == 0x45.toByte() &&
+                sample[2] == 0xDF.toByte() &&
+                sample[3] == 0xA3.toByte()
+        }
+    }.getOrDefault(false)
+
     override fun List<Video>.sortVideos(): List<Video> = this
 
     private fun Hoster.providerPriority(): Int {

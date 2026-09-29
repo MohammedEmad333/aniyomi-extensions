@@ -1,6 +1,7 @@
 apply(from = "repositories.gradle.kts")
 
 include(":core")
+include(":manga-core")
 
 if (System.getenv("CI") != "true") {
     loadAllExtensions()
